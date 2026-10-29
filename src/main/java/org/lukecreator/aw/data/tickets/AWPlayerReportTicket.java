@@ -46,6 +46,8 @@ import java.util.regex.Pattern;
 public class AWPlayerReportTicket extends AWTicket {
     public static final long IN_GAME_PUNISHMENTS_CHANNEL = 1329630658640875575L;
     public static final long BLACKLIST_ROLE = 1329649113368760354L;
+    private static final String SCREENSHOTS_NOT_ACCEPTED_MESSAGE =
+            "We can't accept screenshots as evidence. Please provide a video instead, either by uploading an `.mp4` directly into Discord or by using a supported video service.";
     private static final Map<Pattern, String> SUPPORTED_SERVICES = Map.of(
             Pattern.compile("https?://(?:www\\.)?outplayed\\.tv/roblox/\\w+"), "Outplayed",
             Pattern.compile("https?://(?:www\\.)?medal\\.tv/(?:\\w{2}/)?games/roblox/clips/[A-z0-9_-]+(?:\\?invite=[A-z0-9_-]+)?(?:&v=\\d+)?"), "Medal",
@@ -632,17 +634,22 @@ public class AWPlayerReportTicket extends AWTicket {
             return;
         }
 
-        // check to make sure all attachments are in MP4 format
+        // reporters must submit video evidence. screenshots are rejected here, but moderators can still
+        // attach them using the "Add as Evidence" / "Set as Main Evidence" message commands.
         List<Message.Attachment> attachments = message.getAttachments();
         for (Message.Attachment attachment : attachments) {
+            if (AWEvidence.isImageAttachment(attachment)) {
+                event.getChannel().sendMessage(SCREENSHOTS_NOT_ACCEPTED_MESSAGE).queue();
+                return;
+            }
             if (AWEvidence.isInvalidAttachment(attachment)) {
                 String extension = attachment.getFileExtension();
                 if (extension == null) {
-                    event.getChannel().sendMessage("We can't accept attachments with that file type. For videos, we support `.mp4`, and for images, we support all popular file types.").queue();
+                    event.getChannel().sendMessage("We can't accept attachments with that file type. For video evidence, we support `.mp4`.").queue();
                     return;
                 }
                 extension = extension.replace("`", ""); // prevent pinging via injection
-                event.getChannel().sendMessage("We can't accept attachments with the file type `." + extension + "`. For videos, we support `.mp4`, and for images, we support all popular file types.").queue();
+                event.getChannel().sendMessage("We can't accept attachments with the file type `." + extension + "`. For video evidence, we support `.mp4`.").queue();
                 return;
             }
         }
@@ -685,6 +692,11 @@ public class AWPlayerReportTicket extends AWTicket {
     }
 
     private void onReceivedEvidenceURL(String url, MessageReceivedEvent event) {
+        if (AWEvidence.containsImageLink(url)) {
+            event.getChannel().sendMessage(SCREENSHOTS_NOT_ACCEPTED_MESSAGE).queue();
+            return;
+        }
+
         if (url.isEmpty()) {
             event.getChannel().sendMessage("Please provide a valid link to your evidence. Besides uploading directly in Discord, services we support: " + getSupportedServicesList()).queue();
             return;
@@ -799,6 +811,11 @@ public class AWPlayerReportTicket extends AWTicket {
 
             // check evidence (if present)
             if (!this.evidenceURL.isEmpty()) {
+                if (AWEvidence.containsImageLink(this.evidenceURL)) {
+                    event.getHook().editOriginal(SCREENSHOTS_NOT_ACCEPTED_MESSAGE).queue();
+                    onFinishedLoading.accept(false);
+                    return;
+                }
                 if (!isSupportedService(this.evidenceURL)) {
                     String serviceName = getKnownServiceName(this.evidenceURL);
                     if (serviceName == null)

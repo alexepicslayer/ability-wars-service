@@ -21,6 +21,11 @@ public class AWEvidence {
      */
     public final static long VIDEO_FORWARD_CHANNEL = 1336072275673485433L;
     public final static String[] ALLOWED_EXTENSIONS = new String[]{"mp4", "mov", "png", "jpg", "jpeg"};
+    /**
+     * Extensions which count as screenshots. Moderators may attach these as evidence, but reporters may not.
+     */
+    public final static String[] IMAGE_EXTENSIONS = new String[]{"png", "jpg", "jpeg"};
+    private final static Pattern IMAGE_LINK_PATTERN = Pattern.compile("\\.(?:png|jpe?g)(?:[?#]\\S*)?(?:\\s|$)", Pattern.CASE_INSENSITIVE);
     public final long evidenceId;
     public final long timestamp;
     public Long accusedUserRobloxId;
@@ -70,6 +75,36 @@ public class AWEvidence {
                 return false;
         }
         return true;
+    }
+
+    /**
+     * Checks if the provided attachment is a screenshot (an image file).
+     * Reporters can't submit these as evidence, but moderators can add them manually.
+     *
+     * @param attachment The attachment to check.
+     * @return {@code true} if the attachment has an image file extension.
+     */
+    public static boolean isImageAttachment(Message.Attachment attachment) {
+        String extension = attachment.getFileExtension();
+        if (extension == null)
+            return false;
+        extension = extension.toLowerCase();
+        for (String imageExtension : IMAGE_EXTENSIONS) {
+            if (imageExtension.equals(extension))
+                return true;
+        }
+        return false;
+    }
+
+    /**
+     * Checks if the given text contains a link which points directly at an image file
+     * (for example a Gyazo link ending in {@code .png}).
+     *
+     * @param text The text to check, such as a message or a link field value.
+     * @return {@code true} if it looks like a direct link to a screenshot.
+     */
+    public static boolean containsImageLink(String text) {
+        return text != null && IMAGE_LINK_PATTERN.matcher(text).find();
     }
 
     /**
